@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>みんなの共有買い物リスト</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .input-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+    }
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      background: var(--card-bg);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    li.completed span {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .delete-btn {
+      background: transparent;
+      color: #ef4444;
+      font-size: 1.2rem;
+      padding: 4px 8px;
+    }
+    .share-info {
+      background-color: #e0e7ff;
+      color: #3730a3;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🛒 共有買い物リスト</h1>
+  <div class="share-info">このページのURLを家族や友達に送るだけで共有できます！</div>
+
+  <div class="input-container">
+    <input type="text" id="itemInput" placeholder="買いたいものを入力..." onkeypress="if(event.key==='Enter') addItem()">
+    <button onclick="addItem()">追加</button>
+  </div>
+
+  <ul id="shoppingList"></ul>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // 💡 設定手順2で取得するFirebaseのキーに置き換えてください
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const itemsRef = ref(db, 'shopping-list');
+
+    // リストのリアルタイム同期・表示
+    onValue(itemsRef, (snapshot) => {
+      const listElement = document.getElementById('shoppingList');
+      listElement.innerHTML = '';
+      const data = snapshot.val();
+      
+      if (data) {
+        Object.keys(data).forEach((id) => {
+          const item = data[id];
+          const li = document.createElement('li');
+          if (item.completed) li.classList.add('completed');
+
+          li.innerHTML = `
+            <div class="item-left" onclick="window.toggleItem('${id}', ${!item.completed})">
+              <input type="checkbox" ${item.completed ? 'checked' : ''}>
+              <span>${escapeHtml(item.text)}</span>
+            </div>
+            <button class="delete-btn" onclick="window.deleteItem('${id}')">✕</button>
+          `;
+          listElement.appendChild(li);
+        });
+      }
+    });
+
+    // アイテム追加
+    window.addItem = () => {
+      const input = document.getElementById('itemInput');
+      const text = input.value.trim();
+      if (text !== '') {
+        push(itemsRef, { text: text, completed: false });
+        input.value = '';
+      }
+    };
+
+    // 完了チェック切り替え
+    window.toggleItem = (id, completed) => {
+      update(ref(db, `shopping-list/${id}`), { completed: completed });
+    };
+
+    // アイテム削除
+    window.deleteItem = (id) => {
+      remove(ref(db, `shopping-list/${id}`));
+    };
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+  </script>
+</body>
+</html>
